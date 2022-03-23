@@ -29,3 +29,13 @@ content-type: application/json
 "other": "stuff",
 "id": 3
 }
+###
+POST https://floating-escarpment-28399.herokuapp.com/api/persons/ HTTP/1.1
+content-type: application/json
+
+{
+"name": "New Name",
+"number": "040-123456",
+"other": "stuff",
+"id": 3
+}
