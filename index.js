@@ -10,7 +10,8 @@ const app = express()
 app.use(cors())
 app.use(express.static('build'))
 app.use(express.json())
-morgan.token('body', (req, _) => {
+// eslint-disable-next-line no-unused-vars
+morgan.token('body', (req, _res) => {
   return (_.isEmpty(req.body) ? null : JSON.stringify(req.body))
 })
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
