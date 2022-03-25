@@ -11,7 +11,8 @@
     "deploy": "git push heroku main",
     "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && npm run deploy",
     "logs:prod": "heroku logs --tail",
-    "deploy:full-log": "npm run deploy:full && npm run logs:prod"
+    "deploy:full-log": "npm run deploy:full && npm run logs:prod",
+    "lint": "eslint ."
   },
   "author": "",
   "license": "ISC",
@@ -24,6 +25,7 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "eslint": "^8.11.0",
     "nodemon": "^2.0.15"
   }
 }
