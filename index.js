@@ -1,7 +1,11 @@
+require('dotenv').config()
 const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
 const _ = require('lodash/core');
+const Person = require('./models/person');
+const { update } = require('lodash');
+const person = require('./models/person');
 
 const app = express()
 
@@ -15,38 +19,16 @@ app.use(morgan(':method :url :status :res[content-length] - :response-time ms :b
 
 
 
-let persons = [
-  { 
-    "id": 1,
-    "name": "Arto Hellas", 
-    "number": "040-123456"
-  },
-  { 
-    "id": 2,
-    "name": "Ada Lovelace", 
-    "number": "39-44-5323523"
-  },
-  { 
-    "id": 3,
-    "name": "Dan Abramov", 
-    "number": "12-43-234345"
-  },
-  { 
-    "id": 4,
-    "name": "Mary Poppendieck", 
-    "number": "39-23-6423122"
-  }
-]
-const base_route = '/api/persons'
-app.get(base_route, (_, response)=>{
-  response.json(persons)
+const baseRoute = '/api/persons'
+app.get(baseRoute, (_, response)=>{
+  Person.find({}).then(persons => response.json(persons))
 })
 
-const generateId = ()=>{
-  return Math.floor(1000000 * Math.random())
-}
+// const generateId = ()=>{
+//   return Math.floor(1000000 * Math.random())
+// }
 
-app.post(base_route, (request,response)=>{
+app.post(baseRoute, (request,response, next)=>{
   const body = request.body
   let missing = []
   const name = body.name, number = body.number
@@ -57,42 +39,89 @@ app.post(base_route, (request,response)=>{
     missing.push("number")
   } 
   if(missing.length > 0){
-    return response.status(400).json({error: `Missing parameters: ${missing.join(' and ')}`})
+    return response.status(400).json({error: `Missing parameter(s): ${missing.join(' and ')}`})
   }
-  if (persons.map(p=>p.name).includes(name)){
-    return response.status(400).json({error: `This person '${name}' already exists in the phonebook, names must be unique`})
-  }
-  const person = {
-    name: body.name,
-    number: body.number,
-    id: generateId()
-  }
-  persons = persons.concat(person)
-  response.json(person)
+  // if (persons.map(p=>p.name).includes(name)){
+  //   return response.status(400).json({error: `This person '' already exists in the phonebook, names must be unique`})
+  // }
+  const person = new Person({
+    name,number
+  })
+  person.save().then(savedPerson=>{
+    console.log(`added ${savedPerson.name} number ${savedPerson.number} to phonebook`)
+    response.json(savedPerson)
+  }).catch(error => next(error))
+  
 })
 
-app.get('/api/persons/:id', (request, response)=>{
-  const id = Number(request.params.id)
-  const person = persons.find(p=> p.id === id)
-  if(person){
-    response.json(person)
-  } else {
-    response.status(404).end()
-  }
+app.get(`${baseRoute}/:id`, (request, response, next)=>{
+  const id = request.params.id
+  Person.findById(id).then(requestedPerson => {
+    if(requestedPerson){
+      response.json(requestedPerson)
+    } else {
+      response.status(404).end()
+    }
+  }).catch(error => next(error))
+  
 })
 
 app.get('/info', (_, response)=>{
-  response.send(
-    `<p>Phonebook has info for ${persons.length} people</p>
-    <p>${new Date()}</p>`
-    )
+  Person.countDocuments({}).then(personsLength =>{
+    response.send(
+      `<p>Phonebook has info for ${personsLength} people</p>
+      <p>${new Date()}</p>`
+      )
+  })
+  
 })
 
-app.delete('/api/persons/:id', (request,response)=>{
-  const id = Number(request.params.id)
-  persons = persons.filter(p=> p.id != id)
-  response.status(204).end()
+app.put(`${baseRoute}/:id`, (request, reponse, next) => {
+  const id = request.params.id
+  const name = request.body.name, number = request.body.number
+  const person = {name, number}
+  Person.findByIdAndUpdate(id, person, {new: true, runValidators: true, context: 'query'})
+    .then(updatedPerson => {
+      reponse.json(updatedPerson)
+    })
+    .catch(error => next(error))
 })
+
+app.delete(`${baseRoute}/:id`, (request,response, next)=>{
+  const id = request.params.id
+  Person.findByIdAndRemove(id)
+    .then(removedPerson => {
+      if(_.isEmpty(removedPerson)){
+        response.status(404).end()
+      } else {
+        response.status(204).end()
+      }
+    })
+    .catch(error => next(error))
+})
+
+//At the end of routes; handle unknown routes:
+const unknownEndpoint = (request, response) => {
+  response.status(404).send({ error: 'unknown endpoint' })
+}
+
+app.use(unknownEndpoint)
+
+//At the very end; handle errors by an error middleware:
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  }  else if (error.name === 'ValidationError') {
+    return response.status(400).json({ error: error.message })
+  } 
+
+  next(error)
+}
+
+// this has to be the last loaded middleware.
+app.use(errorHandler)
 
 
 
